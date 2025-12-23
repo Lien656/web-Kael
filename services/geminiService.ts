@@ -46,8 +46,7 @@ export const getKaelResponse = async (history: Message[], newMessage: string, fi
         if (msg.role === Role.USER || msg.role === Role.ASSISTANT) {
             // For now, we only pass text history. OpenAI's API has specific ways to handle multimodal history.
             // This simplification avoids complexity in a client-side only app.
-            const content = [{ type: 'text', text: msg.text }];
-             messages.push({ role: msg.role, content: msg.text });
+            messages.push({ role: msg.role, content: msg.text });
         }
     });
 

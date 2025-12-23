@@ -23,15 +23,6 @@ const ChatInterface: React.FC = () => {
     const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        const storedKey = localStorage.getItem('openai_api_key');
-        if (storedKey) {
-            setApiKey(storedKey);
-        } else {
-            setShowApiKeyModal(true);
-        }
-    }, []);
-    
     const handleInvalidApiKey = useCallback(() => {
         localStorage.removeItem('openai_api_key');
         setApiKey(null);
@@ -55,17 +46,25 @@ const ChatInterface: React.FC = () => {
         }
     }, [handleInvalidApiKey]);
 
-    const handleApiKeySubmit = (key: string) => {
+    useEffect(() => {
+        const storedKey = localStorage.getItem('openai_api_key');
+        if (storedKey) {
+            setApiKey(storedKey);
+        } else {
+            setShowApiKeyModal(true);
+        }
+    }, []);
+    
+    const handleApiKeySubmit = useCallback((key: string) => {
         if (key) {
             setApiKey(key);
             localStorage.setItem('openai_api_key', key);
             setShowApiKeyModal(false);
-            // Trigger Kael's first message if chat is empty
             if (messages.length === 0) {
                  loadInitialMessage(key);
             }
         }
-    };
+    }, [messages.length, loadInitialMessage]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -121,13 +120,12 @@ const ChatInterface: React.FC = () => {
 
         const userMessage: Message = { id: Date.now().toString(), role: Role.USER, text, files: fileAttachments };
         
-        // Use functional update to ensure we have the latest state
-        setMessages(prevMessages => [...prevMessages, userMessage]);
+        const updatedMessages = [...messages, userMessage];
+        setMessages(updatedMessages);
         setIsLoading(true);
 
         try {
-            const currentHistory = [...messages, userMessage];
-            const historyForApi = currentHistory.filter(m => m.role !== Role.SYSTEM).slice(-10);
+            const historyForApi = updatedMessages.filter(m => m.role !== Role.SYSTEM).slice(-10);
             const kaelResponseText = await getKaelResponse(historyForApi, text, files, apiKey);
             
             if (kaelResponseText.includes("Неверный ключ OpenAI API")) {
