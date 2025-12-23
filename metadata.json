@@ -1,0 +1,5 @@
+{
+  "name": "KaelHome AI Chat",
+  "description": "A web-based chat interface for Kael, an AI persona with a distinct and independent personality. Engage in conversation with an AI that has its own will, emotions, and character, powered by the Gemini API.",
+  "requestFramePermissions": []
+}
