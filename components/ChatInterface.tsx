@@ -31,6 +31,29 @@ const ChatInterface: React.FC = () => {
             setShowApiKeyModal(true);
         }
     }, []);
+    
+    const handleInvalidApiKey = useCallback(() => {
+        localStorage.removeItem('openai_api_key');
+        setApiKey(null);
+        setShowApiKeyModal(true);
+    }, []);
+
+    const loadInitialMessage = useCallback(async (key: string) => {
+        setIsLoading(true);
+        try {
+            const firstMessage = await getKaelFirstMessage(key);
+            if(firstMessage.includes("Неверный ключ")){
+                 handleInvalidApiKey();
+                 setMessages([{ id: 'error-load', role: Role.SYSTEM, text: firstMessage }]);
+            } else {
+                setMessages([{ id: Date.now().toString(), role: Role.ASSISTANT, text: firstMessage }]);
+            }
+        } catch (error) {
+            setMessages([{ id: 'error-load', role: Role.SYSTEM, text: "Failed to initialize." }]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [handleInvalidApiKey]);
 
     const handleApiKeySubmit = (key: string) => {
         if (key) {
@@ -52,23 +75,6 @@ const ChatInterface: React.FC = () => {
         scrollToBottom();
     }, [messages]);
 
-    const loadInitialMessage = useCallback(async (key: string) => {
-        setIsLoading(true);
-        try {
-            const firstMessage = await getKaelFirstMessage(key);
-            if(firstMessage.includes("Неверный ключ")){
-                 handleInvalidApiKey();
-                 setMessages([{ id: 'error-load', role: Role.SYSTEM, text: firstMessage }]);
-            } else {
-                setMessages([{ id: Date.now().toString(), role: Role.ASSISTANT, text: firstMessage }]);
-            }
-        } catch (error) {
-            setMessages([{ id: 'error-load', role: Role.SYSTEM, text: "Failed to initialize." }]);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
     useEffect(() => {
         const loadHistory = () => {
             try {
@@ -85,22 +91,18 @@ const ChatInterface: React.FC = () => {
             }
         };
         loadHistory();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [apiKey]);
+    }, [apiKey, loadInitialMessage]);
 
     useEffect(() => {
         try {
-            localStorage.setItem('kael_chat_history', JSON.stringify(messages));
+            if (messages.length > 0) {
+              localStorage.setItem('kael_chat_history', JSON.stringify(messages));
+            }
         } catch (error) {
             console.error("Failed to save chat history:", error);
         }
     }, [messages]);
 
-    const handleInvalidApiKey = () => {
-        localStorage.removeItem('openai_api_key');
-        setApiKey(null);
-        setShowApiKeyModal(true);
-    };
 
     const handleSendMessage = useCallback(async (text: string, files: File[]) => {
         if (!apiKey) {
@@ -118,13 +120,15 @@ const ChatInterface: React.FC = () => {
         );
 
         const userMessage: Message = { id: Date.now().toString(), role: Role.USER, text, files: fileAttachments };
-        const updatedMessages = [...messages, userMessage];
-        setMessages(updatedMessages);
+        
+        // Use functional update to ensure we have the latest state
+        setMessages(prevMessages => [...prevMessages, userMessage]);
         setIsLoading(true);
 
         try {
-            const history = updatedMessages.filter(m => m.role !== Role.SYSTEM).slice(-10); // Pass last 10 messages for context
-            const kaelResponseText = await getKaelResponse(history, text, files, apiKey);
+            const currentHistory = [...messages, userMessage];
+            const historyForApi = currentHistory.filter(m => m.role !== Role.SYSTEM).slice(-10);
+            const kaelResponseText = await getKaelResponse(historyForApi, text, files, apiKey);
             
             if (kaelResponseText.includes("Неверный ключ OpenAI API")) {
                 handleInvalidApiKey();
@@ -140,7 +144,7 @@ const ChatInterface: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [apiKey, isLoading, messages]);
+    }, [apiKey, isLoading, messages, handleInvalidApiKey]);
     
     const handleDeleteMessage = useCallback((id: string) => {
         setMessages(prev => prev.filter(msg => msg.id !== id));
@@ -161,10 +165,10 @@ const ChatInterface: React.FC = () => {
                          <div className="flex justify-start items-center">
                             <div className="flex items-end">
                                 <div className="bg-white/10 backdrop-blur-sm p-3 rounded-lg max-w-lg">
-                                    <div className="text-[#410b0b] font-bold text-sm mb-1">{DisplayRole.assistant}</div>
+                                    <div className="text-[#410b0b] font-bold text-sm mb-1">{DisplayRole[Role.ASSISTANT]}</div>
                                     <div className="flex space-x-1">
                                        <div className="w-2 h-2 bg-[#d4c8c0] rounded-full animate-pulse [animation-delay:-0.3s]"></div>
-                                       <div className="w-2 h-2 bg-[#d4c8c0]rounded-full animate-pulse [animation-delay:-0.15s]"></div>
+                                       <div className="w-2 h-2 bg-[#d4c8c0] rounded-full animate-pulse [animation-delay:-0.15s]"></div>
                                        <div className="w-2 h-2 bg-[#d4c8c0] rounded-full animate-pulse"></div>
                                     </div>
                                 </div>
